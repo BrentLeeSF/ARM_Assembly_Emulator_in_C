@@ -6,7 +6,6 @@ int sum_array_a(int *x, int y);
 int find_max_a(int *x, int y);
 int fib_iter_a(int n);
 int fib_rec_a(int n);
-int find_str_a(char *s, char *sub);
 
 #define NREGS 16
 #define SP 13
@@ -34,6 +33,7 @@ struct arm_state {
     int mem_instr;
 
 };
+
 
 struct arm_state *arm_state_new(unsigned int stack_size, unsigned int *func,
                                 unsigned int arg0, unsigned int arg1,
@@ -109,7 +109,7 @@ bool iw_is_add_instruction(unsigned int iw) {
     unsigned int op, opcode;
 
     op = (iw >> 26) & 0b11;
-    opcode = (iw >> 21) & 0b1111;
+    opcode = (iw >> 21) & 0xF;
 
     return (op == 0) && (opcode == 4);
 
@@ -120,7 +120,7 @@ bool iw_is_sub_instruction(unsigned int iw) {
     unsigned int op, opcode;
 
     op = (iw >>  26) & 0b11;
-    opcode = (iw >> 21) & 0b1111;
+    opcode = (iw >> 21) & 0xF;
 
     return (op == 0) && (opcode == 2);
 
@@ -153,7 +153,7 @@ bool iw_is_mov_instruction(unsigned int iw) {
     unsigned int op, opcode;
 
     op = (iw >>  26) & 0b11;
-    opcode = (iw >> 21) & 0b1111;
+    opcode = (iw >> 21) & 0xF;
 
     return ((op == 0b00) && (opcode == 0b1101));
 
@@ -164,9 +164,9 @@ bool iw_is_mvn_instruction(unsigned int iw) {
     unsigned int op, opcode;
 
     op = (iw >> 26) & 0b11;
-    opcode = (iw >> 21) & 0b1111;
+    opcode = (iw >> 21) & 0xF;
 
-    return (op == 0b00) && (opcode == 0b1111);
+    return (op == 0b00) && (opcode == 0xF);
 
 }
 
@@ -175,7 +175,7 @@ bool iw_is_cmp_instruction(unsigned int iw) {
     unsigned int op, opcode;
 
     op = (iw >> 26) & 0b11;
-    opcode = (iw >> 21) & 0b1111;
+    opcode = (iw >> 21) & 0xF;
 
     return (op == 0) && (opcode == 10);
 
@@ -255,20 +255,20 @@ void execute_add_instruction(struct arm_state *as, unsigned int iw) {
     as->num_instr++;
     as->data_instr++;
 
-    rd = (iw >> 12) & 0b1111;
-    rn = (iw >> 16) & 0b1111;
+    rd = (iw >> 12) & 0xF;
+    rn = (iw >> 16) & 0xFF;
     immediate = (iw >> 25) &0b1;
-    cond = (iw >> 28) & 0b1111;
+    cond = (iw >> 28) & 0xF;
 
     if(is_valid(as, cond)) {
 
     	if(immediate > 0) {
 
-	    value = iw & 0b11111111;
+	    value = iw & 0xFF;
 	    as->regs[rd] = as->regs[rn] + value;
 
     	} else {
-	    value = iw & 0b1111;
+	    value = iw & 0xF;
     	    as->regs[rd] = as->regs[rn] + as->regs[value];
     	}
 
@@ -287,19 +287,19 @@ void execute_sub_instruction(struct arm_state *as, unsigned int iw) {
     as->num_instr++;
     as->data_instr++;
 
-    rd = (iw >> 12) & 0b1111;
-    rn = (iw >> 16) & 0b1111;
+    rd = (iw >> 12) & 0xF;
+    rn = (iw >> 16) & 0xF;
     immediate = (iw >> 25) & 0b1;
-    cond = (iw >> 28) & 0b1111;
+    cond = (iw >> 28) & 0xF;
 
     if(is_valid(as, cond)) {
 
         if(immediate > 0) {
-    	    value = iw & 0b11111111;
+    	    value = iw & 0xFF;
 	    as->regs[rd] = as->regs[rn] - value;
 
         } else {
-	    value = iw & 0b1111;
+	    value = iw & 0xF;
 	    as->regs[rd] = as->regs[rn] - as->regs[value];
     	}
 
@@ -315,11 +315,11 @@ void execute_mvn_instruction(struct arm_state *as, unsigned int iw) {
 
     unsigned int rd, rn, value, immediate, cond, opcode, thirty_two;
 
-    rd = (iw >> 12) & 0b1111;
-    rn = (iw >> 16) & 0b1111;
+    rd = (iw >> 12) & 0xF;
+    rn = (iw >> 16) & 0xF;
     immediate = (iw >> 25) & 0b1;
-    cond = (iw >> 28) & 0b1111;
-    opcode = (iw >> 21) & 0b1111;
+    cond = (iw >> 28) & 0xF;
+    opcode = (iw >> 21) & 0xF;
 
     if(is_valid(as, cond)) {
 
@@ -353,12 +353,12 @@ void execute_mov_instruction(struct arm_state *as, unsigned int iw) {
 
     unsigned int rd, rn, value, immediate, cond, opcode, thirty_two;
 
-    rd = (iw >> 12) & 0b1111;
-    rn = (iw >> 16) & 0b1111;
+    rd = (iw >> 12) & 0xF;
+    rn = (iw >> 16) & 0xF;
 
     immediate = (iw >> 25) & 0b1;
-    cond = (iw >> 28) & 0b1111;
-    opcode = (iw >> 21) & 0b1111;
+    cond = (iw >> 28) & 0xF;
+    opcode = (iw >> 21) & 0xF;
 
     if(is_valid(as, cond)) {
 
@@ -372,7 +372,7 @@ void execute_mov_instruction(struct arm_state *as, unsigned int iw) {
 
     	} else {
 
-	    value = iw & 0b1111;
+	    value = iw & 0xF;
 	    as->regs[rd] = as->regs[value];
 
     	}
@@ -394,8 +394,8 @@ void execute_cmp_instruction(struct arm_state *as, unsigned int iw) {
     as->num_instr++;
     as->data_instr++;
 
-    rd = (iw >> 12) & 0b1111;
-    rn = (iw >> 16) & 0b1111;
+    rd = (iw >> 12) & 0xF;
+    rn = (iw >> 16) & 0xF;
     immediate = (iw >> 25) & 0b1;
 
     as->eq = 0;
@@ -507,7 +507,7 @@ void execute_bl_instruction(struct arm_state *as, unsigned int iw) {
         }
 
         thirty_two = thirty_two << 2;
-	as->regs[PC] += 8;
+	    as->regs[PC] += 8;
         as->regs[LR] = as->regs[PC] - 4;
         as->regs[PC] += thirty_two;
 
@@ -524,39 +524,15 @@ void execute_ldr_instruction(struct arm_state *as, unsigned int iw) {
     as->num_instr++;
     as->mem_instr++;
 
-    rd = (iw >> 12) & 0b1111;
-    rn = (iw >> 16) & 0b1111;
+    rd = (iw >> 12) & 0xF;
+    rn = (iw >> 16) & 0xF;
     rm = iw & 0xF;
 
     unsigned int *num = (unsigned int *)as->regs[rn];
-    num -= rm;
     as->regs[rd] = *num;
 
     if(rd != PC) {
     	as->regs[PC] += 4;
-    }
-
-}
-
-void execute_ldrb_instruction(struct arm_state *as, unsigned int iw) {
-
-    unsigned int rd, rn, rm, offset;
-
-    as->num_instr++;
-    as->mem_instr++;
-
-    rd = (iw >> 12) & 0b1111;
-    rn = (iw >> 16) & 0b1111;
-
-    rm = iw & 0xF;
-    offset = (iw >> 25) & 0b1;
-
-    unsigned char *a;
-    a = (unsigned char *)as->regs[rn];
-    as->regs[rd] = (unsigned int)*a;
-
-    if(rd != PC) {
-	as->regs[PC] += 4;
     }
 
 }
@@ -608,26 +584,34 @@ void arm_state_execute_one(struct arm_state *as) {
 
     if(iw_is_bx_instruction(iw)) {
         execute_bx_instruction(as, iw);
+
     } else if(iw_is_add_instruction(iw)) {
-	execute_add_instruction(as, iw);
+	   execute_add_instruction(as, iw);
+
     } else if(iw_is_sub_instruction(iw)) {
-	execute_sub_instruction(as, iw);
+	   execute_sub_instruction(as, iw);
+
     } else if(iw_is_mov_instruction(iw)) {
-	execute_mov_instruction(as, iw);
+	   execute_mov_instruction(as, iw);
+
     } else if(iw_is_mvn_instruction(iw)) {
-	execute_mvn_instruction(as, iw);
+	   execute_mvn_instruction(as, iw);
+
     } else if(iw_is_cmp_instruction(iw)) {
-	execute_cmp_instruction(as, iw);
+	   execute_cmp_instruction(as, iw);
+
     } else if(iw_is_ldr_instruction(iw)) {
-	execute_ldr_instruction(as, iw);
-    } else if(iw_is_ldrb_instruction(iw)) {
-	execute_ldrb_instruction(as, iw);
+	   execute_ldr_instruction(as, iw);
+
     } else if(iw_is_str_instruction(iw)) {
-	execute_str_instruction(as, iw);
+	   execute_str_instruction(as, iw);
+
     } else if(iw_is_b_instruction(iw)) {
-	execute_b_instruction(as, iw);
+	   execute_b_instruction(as, iw);
+
     } else if(iw_is_bl_instruction(iw)) {
-	execute_bl_instruction(as, iw);
+	   execute_bl_instruction(as, iw);
+
     }
 
 }
@@ -778,27 +762,6 @@ void test_fib_rec() {
 
 }
 
-void test_str() {
-
-    struct arm_state *as;
-    unsigned int rv;
-
-    char full_string[] = "hi";
-    char sub_start[] = "";
-    as = arm_state_new(1024, (unsigned int *)find_str_a, (unsigned int)full_string, (unsigned int)sub_start, 0, 0);
-    rv = arm_state_execute(as);
-
-    printf("\n\n");
-
-    printf("Substring h was found at index %d\n\n", rv);
-
-    printf("String Number of instructions %d\n",as->num_instr);
-    printf("String Data Instructions %d\n",as->data_instr);
-    printf("String Memory Instructions %d\n",as->mem_instr);
-    printf("String Branch Instructions %d\n\n",as->b_instr);
-
-}
-
 int main(int argc, char **argv) {
 
     test_sum();
@@ -808,8 +771,6 @@ int main(int argc, char **argv) {
     test_fib_iter();
 
     test_fib_rec();
-
-    test_str();
 
     return 0;
 
