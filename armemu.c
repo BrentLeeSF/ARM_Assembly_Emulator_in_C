@@ -2,6 +2,62 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/* This program emulates the register state of the CPU.
+It calls each function and creates the necessary registers, flags, 
+and size of stack for each function. Then gets each 32 bit instruction word (line of code), 
+determines it's functionality, and does the functionality. 
+
+
+THERE ARE THREE MAIN INSTRUCTIONS
+
+1. Data Processing (add, sub, mov, mvn, cmp, etc). 
+These instructions have the following: 
+Cond (31:28), Op (27:26)=00, Funct (25:20), Rn (19:16), Rd (15:12), Src2 (11:0)
+
+There are 3 options for Src2. If 25=I=1, then src2 is an immediate value. imm (11:8 = shift, 7:0 = imm8). 
+If 25=I=0 then the src is a register. There are 2 register options.
+Src2 = (shamt5 = shift by constant (11:7), sh=type of shift (6:5) = 00=LSL, 01=LSR, 10=ASR, 11=ROR, 0 (4), reg Rm (3:0)).
+Src2 = (Rs another reg (11:8), 0 (7), sh (type of shift 6:5), 1 (4), Rm = reg (3:0)). Ex. Add R5, R6, R7 -> Rn = 6, Rd = 5, Rm = 7.
+
+2. Memory Instructions (STR (store into memory), LDR (load from memory into register), STRB (store byte into memory), 
+LDRB (load byte from memory into register)). 
+Memory instruction has: cond, op=01, funct (25:20 - I=25 (25=1 for immediate or 25=0 for reg).
+24=P (P=pre-index). 23=U. 22=B. 21=W (write back). 20=L (load and byte). See examples below)
+I = imm (0=imm, U=subtr from base), (1=reg , U = add to base), P (pre-index) and W (write-back) specify index mode for mem instr. 
+P=0,W=0 (post-ind). P=0, W = 1 (ind not support), P = 1, Off = 0 (Offset), P = 1, W = 1 (pre-ind), L=0 & B = 0 =STR, L= 0 & B = 1 =STRB, 
+L=1 & B=0 =LDR, L=1 & B=1=LDRB. 
+Memory also has: Rn (base reg/1st reg 19:16), Rd (15:12), Src2 (11:0) = 2 opt = imm12, OR, (11:7=shat5, 6:5=sh, 4=1, Rm=3:0). 
+Offset = dist from begin to a point.
+
+3. Branch Instuctions: cond (31:28), op (27:26 = 10), funct (25:24. 25=1, 24=0 if Branch, 24=1 if Branch and link), and 
+imm24 (23:0 - immediate value used for instruction address of where to branch to).
+
+
+
+cond (or condition - bits 31-28) determine the condition of the program (or if it should run).
+The bits are as follows: NZCV (N=31, Z=30, C=29, V=28). 
+N = negative, Z = zero, C = carry, V = overflow
+Examples: cond = 1110 (in hex or 14 in decimal) = always run. cond = 0000 (ex. addeq add if equals).
+
+Op (27:26 - op code or operation). 00=data instruction, 01=memory instruction (str,ldr,ldrb), 10=branch instruction.
+
+funct (25:20 (I=25, cmd=24:21, s=20).) If I=1 then instruction uses immediate value (0=reigster). 
+If S=1, then the cond sets a condition flag (see cond).
+
+cmd (24:21) indicates the data processing instruction (ex. 0110=add, 0110=subtract, 1101=mov)
+
+Rn (19:16. Is the 1st regester (base reg)).
+
+Rd (15:12. Is the destination register. Where the value will be put into).
+
+Src2 (11:0 - see Data Instructions for 3 options of Src2).
+
+
+
+to run this program you must have a Raspberry Pi. In terminal call: 
+1. make
+2. ./armemu */
+
 int sum_array_a(int *x, int y);
 int find_max_a(int *x, int y);
 int fib_iter_a(int n);
@@ -193,17 +249,6 @@ bool iw_is_ldr_instruction(unsigned int iw) {
 
 }
 
-bool iw_is_ldrb_instruction(unsigned int iw) {
-
-    unsigned int opcode, l_flag, b_flag;
-
-    opcode = (iw >> 26) & 0b11;
-    l_flag = (iw >> 20) & 0b1;
-    b_flag = (iw >> 22) & 0b1;
-
-    return (opcode == 1) && (l_flag == 1) && (b_flag == 1);
-
-}
 
 bool iw_is_str_instruction(unsigned int iw) {
 
@@ -581,6 +626,7 @@ void arm_state_execute_one(struct arm_state *as) {
 
     pc = (unsigned int *) as->regs[PC];
     iw = *pc;
+
 
     if(iw_is_bx_instruction(iw)) {
         execute_bx_instruction(as, iw);
