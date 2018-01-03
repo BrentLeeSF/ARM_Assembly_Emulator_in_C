@@ -33,7 +33,6 @@ Offset = dist from begin to a point.
 imm24 (23:0 - immediate value used for instruction address of where to branch to).
 
 
-
 cond (or condition - bits 31-28) determine the condition of the program (or if it should run).
 The bits are as follows: NZCV (N=31, Z=30, C=29, V=28). 
 N = negative, Z = zero, C = carry, V = overflow
@@ -53,11 +52,12 @@ Rd (15:12. Is the destination register. Where the value will be put into).
 Src2 (11:0 - see Data Instructions for 3 options of Src2).
 
 
-
 to run this program you must have a Raspberry Pi. In terminal call: 
 1. make
 2. ./armemu */
 
+
+/* Call ARM functions */
 int sum_array_a(int *x, int y);
 int find_max_a(int *x, int y);
 int fib_iter_a(int n);
@@ -68,6 +68,7 @@ int fib_rec_a(int n);
 #define LR 14
 #define PC 15
 
+/* Used to create emulated CPU */
 struct arm_state {
 
     unsigned int regs[NREGS];
@@ -90,7 +91,7 @@ struct arm_state {
 
 };
 
-
+/* Create emulated CPU */
 struct arm_state *arm_state_new(unsigned int stack_size, unsigned int *func,
                                 unsigned int arg0, unsigned int arg1,
                                 unsigned int arg2, unsigned int arg3) {
@@ -142,6 +143,7 @@ struct arm_state *arm_state_new(unsigned int stack_size, unsigned int *func,
     return as;
 }
 
+/* Used to free memory from stack */
 void arm_state_free(struct arm_state *as) {
 
     free(as->stack);
@@ -149,6 +151,7 @@ void arm_state_free(struct arm_state *as) {
 
 }
 
+/* print register values */
 void arm_state_print(struct arm_state *as) {
 
     int i;
@@ -160,6 +163,7 @@ void arm_state_print(struct arm_state *as) {
 
 }
 
+/* Determines if an add instruction (see info above for more details) */
 bool iw_is_add_instruction(unsigned int iw) {
 
     unsigned int op, opcode;
@@ -171,6 +175,7 @@ bool iw_is_add_instruction(unsigned int iw) {
 
 }
 
+/* Determines if an sub instruction (see info above for more details) */
 bool iw_is_sub_instruction(unsigned int iw) {
 
     unsigned int op, opcode;
@@ -182,6 +187,7 @@ bool iw_is_sub_instruction(unsigned int iw) {
 
 }
 
+/* Determines if branch instruction (see info above for more details) */
 bool iw_is_b_instruction(unsigned int iw) {
 
     unsigned int op, funct;
@@ -193,6 +199,7 @@ bool iw_is_b_instruction(unsigned int iw) {
 
 }
 
+/* Determines if branch and link instruction (see info above for more details) */
 bool iw_is_bl_instruction(unsigned int iw) {
 
     unsigned int op, funct;
@@ -204,6 +211,7 @@ bool iw_is_bl_instruction(unsigned int iw) {
 
 }
 
+/* Determines if mov instruction (see info above for more details) */
 bool iw_is_mov_instruction(unsigned int iw) {
 
     unsigned int op, opcode;
@@ -215,6 +223,7 @@ bool iw_is_mov_instruction(unsigned int iw) {
 
 }
 
+/* Determines if mvn instruction (see info above for more details) */
 bool iw_is_mvn_instruction(unsigned int iw) {
 
     unsigned int op, opcode;
@@ -226,6 +235,7 @@ bool iw_is_mvn_instruction(unsigned int iw) {
 
 }
 
+/* Determines if cmp instruction (see info above for more details) */
 bool iw_is_cmp_instruction(unsigned int iw) {
 
     unsigned int op, opcode;
@@ -237,6 +247,7 @@ bool iw_is_cmp_instruction(unsigned int iw) {
 
 }
 
+/* Determines if ldr instruction (see info above for more details) */
 bool iw_is_ldr_instruction(unsigned int iw) {
 
     unsigned int opcode, l_flag, b_flag;
@@ -249,7 +260,7 @@ bool iw_is_ldr_instruction(unsigned int iw) {
 
 }
 
-
+/* Determines if str instruction (see info above for more details) */
 bool iw_is_str_instruction(unsigned int iw) {
 
     unsigned int opcode, l_flag, b_flag;
@@ -261,6 +272,10 @@ bool iw_is_str_instruction(unsigned int iw) {
 
 }
 
+/* Determines if the instruction is valid and should be executed. 
+Ex if instruction is addeq, it checks if z flag = 1 and cond = 0000
+If these are both met, then the instruction should be executed. If not,
+then in the program will skip to the next instruction. See info above for more details) */
 bool is_valid(struct arm_state *as, unsigned int cond) {
 
     bool cond_valid = false;
@@ -293,6 +308,11 @@ bool is_valid(struct arm_state *as, unsigned int cond) {
 
 }
 
+/* Gets all information for Data Instruction (see above for details)
+Determines if it should be executed (ex. if addeq, but the values do not equal, 
+then do not execute and skip to next instruction (PC += 4)). If it is valid,
+determine if it uses an immediate value or value from a register. Adds values
+and puts value in destination register. Then PC += 4 to get next instruction */
 void execute_add_instruction(struct arm_state *as, unsigned int iw) {
 
     unsigned int rd, rn, value, immediate, cond;
@@ -309,15 +329,15 @@ void execute_add_instruction(struct arm_state *as, unsigned int iw) {
 
     	if(immediate > 0) {
 
-	    value = iw & 0xFF;
-	    as->regs[rd] = as->regs[rn] + value;
+	       value = iw & 0xFF;
+	       as->regs[rd] = as->regs[rn] + value;
 
     	} else {
-	    value = iw & 0xF;
-    	    as->regs[rd] = as->regs[rn] + as->regs[value];
+	       value = iw & 0xF;
+    	   as->regs[rd] = as->regs[rn] + as->regs[value];
     	}
 
-	as->regs[PC] += 4;
+	   as->regs[PC] += 4;
 
     } else {
     	as->regs[PC] += 4;
@@ -325,6 +345,11 @@ void execute_add_instruction(struct arm_state *as, unsigned int iw) {
 
 }
 
+/* Gets all information for Data Instruction (see above for details)
+Determines if it should be executed (ex. if subeq, but the values do not equal, 
+then do not execute and skip to next instruction (PC += 4)). If it is valid,
+determine if it uses an immediate value or value from a register. Subtracts values
+and puts value in destination register. Then PC += 4 to get next instruction */
 void execute_sub_instruction(struct arm_state *as, unsigned int iw) {
 
     unsigned int rd, rn, rm, value, immediate, cond;
@@ -340,15 +365,15 @@ void execute_sub_instruction(struct arm_state *as, unsigned int iw) {
     if(is_valid(as, cond)) {
 
         if(immediate > 0) {
-    	    value = iw & 0xFF;
-	    as->regs[rd] = as->regs[rn] - value;
+    	   value = iw & 0xFF;
+	       as->regs[rd] = as->regs[rn] - value;
 
         } else {
-	    value = iw & 0xF;
-	    as->regs[rd] = as->regs[rn] - as->regs[value];
+	       value = iw & 0xF;
+	       as->regs[rd] = as->regs[rn] - as->regs[value];
     	}
 
- 	as->regs[PC] += 4;
+ 	    as->regs[PC] += 4;
 
     } else {
     	as->regs[PC] += 4;
@@ -356,6 +381,13 @@ void execute_sub_instruction(struct arm_state *as, unsigned int iw) {
 
 }
 
+/* Gets all information for Data Instruction (see above for details)
+Determines if it should be executed (ex. if addeq, but the values do not equal, 
+then do not execute and skip to next instruction (PC += 4)). If it is valid,
+determine if it uses an immediate value or value from a register. 
+If value is immediate then it is negative, then mask the bits and put masked bits
+into destination register. Else, put value from register into destination register.
+Then PC += 4 to get next instruction */
 void execute_mvn_instruction(struct arm_state *as, unsigned int iw) {
 
     unsigned int rd, rn, value, immediate, cond, opcode, thirty_two;
@@ -368,18 +400,18 @@ void execute_mvn_instruction(struct arm_state *as, unsigned int iw) {
 
     if(is_valid(as, cond)) {
 
-	as->num_instr++;
-	as->data_instr++;
+	    as->num_instr++;
+	    as->data_instr++;
 
         if(immediate > 0) {
 
             value = iw & 0xFF;
-	    value = ~value;
+	        value = ~value;
             as->regs[rd] = value;
 
         } else {
 
-            value = iw & 0b1111;
+            value = iw & 0xF;
             as->regs[rd] = as->regs[value];
 
         }
@@ -394,6 +426,13 @@ void execute_mvn_instruction(struct arm_state *as, unsigned int iw) {
 
 }
 
+/* Gets all information for Data Instruction (see above for details)
+Determines if it should be executed (ex. if addeq, but the values do not equal, 
+then do not execute and skip to next instruction (PC += 4)). If it is valid,
+determine if it uses an immediate value or value from a register. 
+If value is immediate then put value into destination register. 
+Else, put value from register into destination register.
+Then PC += 4 to get next instruction */
 void execute_mov_instruction(struct arm_state *as, unsigned int iw) {
 
     unsigned int rd, rn, value, immediate, cond, opcode, thirty_two;
@@ -407,8 +446,8 @@ void execute_mov_instruction(struct arm_state *as, unsigned int iw) {
 
     if(is_valid(as, cond)) {
 
-	as->num_instr++;
-	as->data_instr++;
+	    as->num_instr++;
+	    as->data_instr++;
 
     	if(immediate > 0) {
 
@@ -417,14 +456,14 @@ void execute_mov_instruction(struct arm_state *as, unsigned int iw) {
 
     	} else {
 
-	    value = iw & 0xF;
-	    as->regs[rd] = as->regs[value];
+	        value = iw & 0xF;
+	        as->regs[rd] = as->regs[value];
 
     	}
 
-	if(rd != PC) {
-		as->regs[PC] += 4;
-	}
+    	if(rd != PC) {
+    		as->regs[PC] += 4;
+    	}
 
     } else if(rd != PC) {
     	as->regs[PC] += 4;
